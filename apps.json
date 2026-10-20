@@ -7,31 +7,6 @@
       "description": "여행기록 어플",
       "icon": "🌿",
       "url": "GABODA/"
-    },
-    {
-      "type": "download",
-      "tag": "Windows",
-      "name": "앱 이름 2",
-      "description": "다운로드: 누르면 zip 파일이 바로 내려받아져요.",
-      "icon": "🍃",
-      "version": "v1.0.0",
-      "size": "12MB",
-      "url": ""
-    },
-    {
-      "type": "link",
-      "tag": "Chrome 확장",
-      "name": "앱 이름 3",
-      "description": "링크: 누르면 Chrome 웹 스토어 같은 외부 주소가 새 탭으로 열려요.",
-      "icon": "🌲",
-      "url": ""
-    },
-    {
-      "type": "pwa",
-      "name": "앱 이름 4",
-      "description": "type 을 생략하면 PWA 로 처리돼요.",
-      "icon": "🍄",
-      "url": ""
     }
   ]
 }
