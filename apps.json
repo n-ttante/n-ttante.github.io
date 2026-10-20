@@ -3,10 +3,10 @@
   "apps": [
     {
       "type": "pwa",
-      "name": "앱 이름 1",
-      "description": "PWA: 누르면 앱 페이지(app1/)로 이동해 그곳에서 설치해요.",
+      "name": "가보다",
+      "description": "여행기록 어플",
       "icon": "🌿",
-      "url": ""
+      "url": "GABODA/"
     },
     {
       "type": "download",
