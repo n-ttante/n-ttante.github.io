@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>받다 · BADDA</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Noto+Sans+KR:wght@500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#e8f1e1; --green:#2f9e5a; --deep:#1d5a35; --cover:#b9dcbf;
+  --R:min(17.5vw,20.5vh);              /* 육각형 한 변의 길이 */
+  --H:calc(var(--R) * 1.7320508);    /* 육각형 높이 */
+}
+*{box-sizing:border-box;margin:0}
+html,body{height:100%}
+body{
+  background:var(--bg);
+  font-family:"Noto Sans KR",system-ui,sans-serif;
+  min-height:100dvh; display:flex; align-items:center; justify-content:center;
+  padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+  overflow:hidden;
+}
+.stage{position:relative;width:calc(var(--R)*5);height:calc(var(--H)*2)}
+.ghost{position:absolute;z-index:0;pointer-events:none;overflow:visible;
+  left:calc(var(--R)*-6);top:calc(var(--R)*-5);width:calc(var(--R)*17);height:calc(var(--R)*13)}
+.hex{position:absolute;z-index:1;width:calc(var(--R)*2);height:var(--H)}
+.hex.l{left:0;top:calc(var(--H)*.5)}
+.hex.r{left:calc(var(--R)*3);top:calc(var(--H)*.5)}
+.hex.c{left:calc(var(--R)*1.5);top:var(--H)}
+.hex canvas{
+  display:block;width:100%;height:100%;
+  image-rendering:pixelated;image-rendering:crisp-edges;
+  clip-path:polygon(25% 0,75% 0,100% 50%,75% 100%,25% 100%,0 50%);
+}
+.hex.c svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+/* 가운데 육각형을 반으로 나눈 두 버튼 */
+.half{
+  position:absolute;left:0;width:100%;height:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-family:"Black Han Sans",sans-serif;font-size:calc(var(--R)*.3);
+  color:var(--deep);text-decoration:none;letter-spacing:.06em;
+  background:rgba(47,158,90,0);transition:background .15s;
+  -webkit-tap-highlight-color:transparent;outline:none;cursor:pointer;
+}
+.half.top{top:0;padding-top:calc(var(--R)*.1);
+  clip-path:polygon(25% 0,75% 0,100% 100%,0 100%)}
+.half.bottom{top:50%;padding-bottom:calc(var(--R)*.1);
+  clip-path:polygon(0 0,100% 0,75% 100%,25% 100%)}
+.half:hover,.half:focus-visible{background:rgba(47,158,90,.2)}
+.half:active{background:rgba(47,158,90,.34)}
+
+/* 페이지 이동: 벌집이 시간차로 채워지는 막 */
+#veil{position:fixed;inset:0;z-index:50;pointer-events:none;transition:opacity .5s}
+#veil.out{opacity:0}
+#cover{position:absolute;inset:0;width:100%;height:100%}
+.cell{
+  fill:var(--cover);stroke:var(--cover);stroke-width:2;stroke-linejoin:round;
+  opacity:0;transform-box:fill-box;transform-origin:center;
+  animation:cellin .24s cubic-bezier(.2,.9,.3,1.25) forwards;
+}
+@keyframes cellin{from{opacity:0;transform:scale(.5)}to{opacity:1;transform:scale(1)}}
+#curtain{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.6em}
+#curtain.show{background:var(--cover)}
+#curtain .word{opacity:0}
+#curtain.show .word{animation:wordin .5s cubic-bezier(.2,.9,.3,1.2) both}
+@keyframes wordin{from{opacity:0;transform:translateY(.25em) scale(.92)}to{opacity:1;transform:none}}
+#kw{
+  font-family:"Black Han Sans",sans-serif;color:#000;line-height:1;
+  font-size:clamp(3.6rem,14vmin,9rem);
+  text-shadow:.06em .06em 0 var(--green);
+}
+#ken{
+  font-family:"Noto Sans KR",sans-serif;font-weight:500;color:#4c7a5a;
+  font-size:clamp(.85rem,2.2vmin,1.15rem);letter-spacing:.4em;padding-left:.4em;
+}
+@keyframes cellout{from{opacity:1;transform:scale(1)}to{opacity:0;transform:scale(.5)}}
+.cell.out{animation-name:cellout;animation-fill-mode:both}
+
+/* 화면 안에서 바뀌는 페이지 (소개 / 장터) */
+.view{
+  position:fixed;inset:0;z-index:60;overflow:auto;background:var(--cover);
+  opacity:0;visibility:hidden;transition:opacity .45s,visibility 0s .45s;
+  padding:max(24px,env(safe-area-inset-top)) max(24px,5vw) max(40px,env(safe-area-inset-bottom));
+}
+.view.on{opacity:1;visibility:visible;transition:opacity .45s}
+.view .inner{max-width:880px;margin:0 auto}
+.back{
+  font-family:"Black Han Sans",sans-serif;font-size:1rem;letter-spacing:.06em;
+  color:var(--bg);background:var(--deep);border:0;cursor:pointer;
+  padding:.85em 2.1em;
+  clip-path:polygon(14px 0,calc(100% - 14px) 0,100% 50%,calc(100% - 14px) 100%,14px 100%,0 50%);
+  transition:background .15s;
+}
+.back:hover,.back:focus-visible{background:#000;outline:none}
+.view h2{
+  font-family:"Black Han Sans",sans-serif;font-weight:400;color:#000;line-height:1;
+  font-size:clamp(3rem,11vmin,6rem);margin:.9em 0 .25em;
+  text-shadow:.06em .06em 0 var(--green);
+}
+.view .en{margin:0 0 1.6em;font-size:.95rem;color:#4c7a5a;letter-spacing:.38em}
+.view p.lead{font-size:1.1rem;line-height:1.8;color:#1f3a28;max-width:34em}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:18px}
+.app{
+  background:rgba(255,255,255,.45);padding:22px 22px 26px;
+  clip-path:polygon(0 0,calc(100% - 22px) 0,100% 22px,100% 100%,0 100%);
+}
+.app h3{font-family:"Black Han Sans",sans-serif;font-weight:400;font-size:1.35rem;color:var(--deep);margin-bottom:.35em}
+.app p{font-size:.95rem;line-height:1.6;color:#2e4a38;margin-bottom:1.1em}
+.get{
+  display:inline-block;text-decoration:none;font-weight:500;font-size:.9rem;
+  color:var(--bg);background:var(--deep);padding:.6em 1.6em;
+  clip-path:polygon(10px 0,calc(100% - 10px) 0,100% 50%,calc(100% - 10px) 100%,10px 100%,0 50%);
+}
+.get:hover,.get:focus-visible{background:#000;outline:none}
+.get.off{opacity:.45;pointer-events:none}
+.app .top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:.6em;min-height:2rem}
+.app .icon{display:block;font-size:2rem;line-height:1}
+.app .tag{margin-left:auto;font-size:.72rem;font-weight:500;letter-spacing:.06em;color:var(--deep);
+  background:rgba(47,158,90,.22);padding:.25em .9em;
+  clip-path:polygon(8px 0,calc(100% - 8px) 0,100% 50%,calc(100% - 8px) 100%,8px 100%,0 50%)}
+.app p.meta{font-size:.8rem;color:#4c7a5a;margin:-.5em 0 1em}
+.app img.icon{width:44px;height:44px;object-fit:contain}
+.tagline{font-family:"Black Han Sans",sans-serif;font-size:clamp(1.3rem,4vmin,1.9rem);color:var(--deep);margin-bottom:.8em}
+.view p.lead + p.lead{margin-top:1em}
+.links{display:flex;flex-wrap:wrap;gap:12px;margin-top:1.8em}
+@media (prefers-reduced-motion:reduce){.cell{animation-duration:.01s}.view,.view.on{transition:none}}
+
+.title{
+  position:absolute; z-index:2; text-align:center;
+  left:calc(var(--R)*2.5); top:calc(var(--H)*.5);
+  transform:translate(-50%,-50%);
+}
+h1{
+  font-family:"Black Han Sans",sans-serif; font-weight:400;
+  font-size:calc(var(--R)*.62); line-height:1.05; color:#000;
+  text-shadow:calc(var(--R)*.05) calc(var(--R)*.05) 0 var(--green);
+}
+.en{
+  margin-top:calc(var(--R)*.04);
+  font-family:"Noto Sans KR",sans-serif; font-weight:500;
+  font-size:calc(var(--R)*.13); letter-spacing:.38em; padding-left:.38em;
+  color:#8c958d;
+}
+</style>
+</head>
+<body>
+<main class="stage">
+  <svg class="ghost" id="ghost" viewBox="-6 -5 17 13" aria-hidden="true"></svg>
+  <div class="hex l"><canvas id="cl" width="80" height="70" aria-hidden="true"></canvas></div>
+  <div class="hex r"><canvas id="cr" width="80" height="70" aria-hidden="true"></canvas></div>
+  <div class="hex c">
+    <svg viewBox="0 0 200 173.2" aria-hidden="true">
+      <polygon points="50,0 150,0 200,86.6 150,173.2 50,173.2 0,86.6"
+               fill="none" stroke="#2f9e5a" stroke-width="6" stroke-linejoin="miter"/>
+      <line x1="0" y1="86.6" x2="200" y2="86.6" stroke="#2f9e5a" stroke-width="4"/>
+    </svg>
+    <a class="half top" href="#about" data-view="about" data-ko="소개" data-en="SOGAE">소개</a>
+    <a class="half bottom" href="#apps" data-view="apps" data-ko="장터" data-en="JANGTEO">장터</a>
+  </div>
+  <div class="title">
+    <h1>받다</h1>
+    <p class="en">BADDA</p>
+  </div>
+</main>
+
+<section class="view" id="view-about" aria-label="소개" aria-hidden="true">
+  <div class="inner">
+    <button class="back" type="button">‹ 돌아가기</button>
+    <h2>소개</h2>
+    <p class="en">SOGAE</p>
+    <div id="about-body"><p class="lead">불러오는 중…</p></div>
+  </div>
+</section>
+
+<section class="view" id="view-apps" aria-label="장터" aria-hidden="true">
+  <div class="inner">
+    <button class="back" type="button">‹ 돌아가기</button>
+    <h2>장터</h2>
+    <p class="en">JANGTEO</p>
+    <div id="apps-body"><p class="lead">불러오는 중…</p></div>
+  </div>
+</section>
+
+<div id="veil" aria-hidden="true">
+  <svg id="cover"></svg>
+  <div id="curtain"><div class="word"><div id="kw"></div></div><div class="word"><div id="ken"></div></div></div>
+</div>
+
+<script>
+// ───────── 도트 숲: 바람에 흔들리는 픽셀 아트 ─────────
+(function () {
+  var W = 80, H = 70;
+  var PAL = {
+    trunk:'#4a3a2a',
+    far:  ['#8fc79a','#7bb98a','#a6d6a8'],   // mid, dark, light
+    mid:  ['#3f9150','#2d7541','#62b564'],
+    near: ['#245f38','#184a2b','#2f7d46'],
+    hill1:'#a3d3a4', hill2:'#7fbd8c', grass:['#1d4a2e','#2f7d46','#5cae5f']
+  };
+
+  function rng(seed){return function(){seed=(seed*1664525+1013904223)%4294967296;return seed/4294967296;};}
+
+  function makeScene(cfg){
+    var r = rng(cfg.seed), s = {cfg:cfg, trees:[], leaves:[], clouds:[]};
+    function add(n, layer, hMin, hMax, baseY){
+      for (var i=0;i<n;i++){
+        s.trees.push({layer:layer, x:Math.floor(-4 + r()*(W+8)), base:baseY + Math.floor(r()*3),
+          ht:Math.floor(hMin + r()*(hMax-hMin)), ph:r()*6.28});
+      }
+    }
+    add(11,'far', 11,15, 47);
+    add(6, 'mid', 19,24, 57);
+    add(3, 'near',30,37, 72);
+    s.trees.sort(function(a,b){return ['far','mid','near'].indexOf(a.layer)-['far','mid','near'].indexOf(b.layer);});
+    for (var i=0;i<9;i++) s.leaves.push({x:r()*W,y:r()*H,v:3+r()*4,f:1+r()*2,fall:2+r()*3,ph:r()*6.28});
+    for (var j=0;j<3;j++) s.clouds.push({x:r()*(W+30),y:6+r()*16,v:.8+r()*.8,w:10+Math.floor(r()*8)});
+    return s;
+  }
+
+  function wind(t,x){ return Math.sin(t*1.3 + x*.06)*.6 + Math.sin(t*.5 + x*.02)*.4; }
+
+  function tree(ctx, x, base, ht, cols, amp, ph, t){
+    var top = base - ht - 4;
+    for (var j=0;j<ht;j++){
+      var k=j%6, tier=Math.floor(j/6);
+      var hw = 1 + tier*2 + Math.floor(k*.7);
+      var off = Math.round(wind(t+ph, x)*amp*(1-j/ht));
+      var y = top + j, left = x + off - hw;
+      ctx.fillStyle=cols[0]; ctx.fillRect(left, y, hw*2+1, 1);
+      ctx.fillStyle=cols[2]; ctx.fillRect(left, y, Math.max(1,Math.ceil(hw/2)), 1);
+      ctx.fillStyle=cols[1]; ctx.fillRect(x+off+Math.ceil(hw/2)+ (hw>1?0:1), y, Math.floor(hw/2)+ (hw>1?1:0), 1);
+    }
+    ctx.fillStyle=PAL.trunk; ctx.fillRect(x, top+ht, 1, 4);
+  }
+
+  function draw(ctx, s, t){
+    var c = s.cfg, i, x, y;
+    // 하늘 (띠 + 디더링)
+    var bands = c.sky.length, bh = Math.ceil(H/bands);
+    for (y=0;y<H;y++){
+      var b = Math.min(bands-1, Math.floor(y/bh));
+      ctx.fillStyle=c.sky[b]; ctx.fillRect(0,y,W,1);
+      if (b>0 && y%bh<2){
+        ctx.fillStyle=c.sky[b-1];
+        for (x=(y+1)%2;x<W;x+=2) ctx.fillRect(x,y,1,1);
+      }
+    }
+    // 해 / 달
+    ctx.fillStyle=c.sun.c;
+    for (var dy=-c.sun.r;dy<=c.sun.r;dy++) for (var dx=-c.sun.r;dx<=c.sun.r;dx++)
+      if (dx*dx+dy*dy<=c.sun.r*c.sun.r+1) ctx.fillRect(c.sun.x+dx,c.sun.y+dy,1,1);
+    // 구름
+    ctx.fillStyle=c.cloud;
+    s.clouds.forEach(function(cl){
+      var cx = Math.floor((cl.x + t*cl.v) % (W+30)) - 15, w = cl.w, cy = Math.floor(cl.y);
+      ctx.fillRect(cx+2,cy,w-4,1); ctx.fillRect(cx,cy+1,w,2); ctx.fillRect(cx+3,cy-1,w-8,1);
+    });
+    // 먼 언덕
+    for (x=0;x<W;x++){
+      var h1 = Math.floor(40 + Math.sin(x*.08+c.seed)*4 + Math.sin(x*.19)*2);
+      ctx.fillStyle=PAL.hill1; ctx.fillRect(x,h1,1,H-h1);
+      var h2 = Math.floor(49 + Math.sin(x*.1+2+c.seed)*3);
+      ctx.fillStyle=PAL.hill2; ctx.fillRect(x,h2,1,H-h2);
+    }
+    // 나무 (먼 것 → 가까운 것)
+    s.trees.forEach(function(tr){
+      var amp = tr.layer==='far'?1:tr.layer==='mid'?2:3;
+      tree(ctx, tr.x, tr.base, tr.ht, PAL[tr.layer], amp, tr.ph, t);
+    });
+    // 풀밭
+    ctx.fillStyle=PAL.grass[0]; ctx.fillRect(0,H-5,W,5);
+    for (x=0;x<W;x+=2){
+      var bhh = 3 + ((x*7+c.seed)%4);
+      for (i=0;i<bhh;i++){
+        var lean = Math.round(wind(t,x)*(i/bhh)*1.8);
+        ctx.fillStyle = i>=bhh-1 ? PAL.grass[2] : PAL.grass[1];
+        ctx.fillRect(x+lean, H-5-i, 1, 1);
+      }
+    }
+    // 바람에 날리는 잎
+    ctx.fillStyle=c.leaf;
+    s.leaves.forEach(function(p){
+      var lx = (p.x + t*p.v) % (W+6) - 3;
+      var ly = (p.y + t*p.fall) % H + Math.sin(t*p.f+p.ph)*3;
+      ctx.fillRect(Math.floor(lx), Math.floor(ly), 2, 1);
+    });
+  }
+
+  var scenes = [
+    { id:'cl', seed:7,  sun:{x:16,y:14,r:5,c:'#fff1ae'}, cloud:'#f6fbe9', leaf:'#c8e878',
+      sky:['#bfe5c9','#cdecc9','#dcf1c8','#e9f5c9','#f3f8cc','#f8fad0'] },
+    { id:'cr', seed:23, sun:{x:62,y:15,r:4,c:'#f3f6e4'}, cloud:'#cfe7d3', leaf:'#e8f08a',
+      sky:['#8fc7ad','#a2d1b2','#b6dbb8','#c9e5bc','#dbedc0','#e8f3c5'] }
+  ].map(function(cfg){
+    var cv = document.getElementById(cfg.id), ctx = cv.getContext('2d');
+    return {ctx:ctx, scene:makeScene(cfg)};
+  });
+
+  var reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function frame(ms){ var t = ms/1000; scenes.forEach(function(o){ draw(o.ctx,o.scene,t); }); }
+  frame(0);
+  if (!reduce){
+    var last = 0;
+    (function loop(ms){
+      if (ms - last > 90){ last = ms; frame(ms); }   // 약 11fps: 도트다운 끊기는 움직임
+      requestAnimationFrame(loop);
+    })(0);
+  }
+})();
+</script>
+<script>
+// ───────── 바깥으로 이어지는 벌집 (가장자리로 갈수록 옅어짐) ─────────
+(function () {
+  var g = document.getElementById('ghost'), S = Math.sqrt(3)/2, out = '';
+  for (var i=-4;i<=6;i++) for (var j=-5;j<=8;j++){
+    var cx = 1 + 1.5*i, cy = 2*S*(j + (i%2?0.5:0)) ;
+    // 중심(스테이지 가운데)에서 멀수록 투명
+    var d = Math.hypot(cx-2.5, cy-2*S), a = Math.max(0, .26 - d*.05);
+    // 실제 육각형 3칸은 제외 (왼쪽·오른쪽·가운데 아래)
+    var real = (Math.abs(cx-1)<.01&&Math.abs(cy-2*S)<.01)||(Math.abs(cx-4)<.01&&Math.abs(cy-2*S)<.01)||(Math.abs(cx-2.5)<.01&&Math.abs(cy-3*S)<.01);
+    if (a<=0.01 || real) continue;
+    var pts=[[cx-1,cy],[cx-.5,cy-S],[cx+.5,cy-S],[cx+1,cy],[cx+.5,cy+S],[cx-.5,cy+S]].map(function(p){return p[0].toFixed(3)+','+p[1].toFixed(3);}).join(' ');
+    var fill = ((i*7+j*13)%5+5)%5===0 ? 'rgba(47,158,90,'+(a*.22).toFixed(3)+')' : 'none';
+    out += '<polygon points="'+pts+'" fill="'+fill+'" stroke="rgba(47,158,90,'+a.toFixed(3)+')" stroke-width=".022"/>';
+  }
+  g.innerHTML = out;
+})();
+</script>
+<script>
+// ───────── 화면 전환: 벌집이 따다닥 채워지며 덮이고, 그 안에서 소개/장터 화면이 나타남 ─────────
+(function () {
+  var reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var veil = document.getElementById('veil'), cover = document.getElementById('cover'),
+      curtain = document.getElementById('curtain'),
+      kw = document.getElementById('kw'), ken = document.getElementById('ken');
+  var busy = false, cur = null, curView = null;
+
+  // ── JSON 에서 내용 읽어오기 (about.json / apps.json) ──
+  var FILES = {about:'about.json', apps:'apps.json'}, cache = {};
+  function el(tag, cls, text){ var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+  function safeUrl(u){                      // 상대경로, http(s)만 허용 (javascript: 등 차단)
+    u = String(u || '').trim();
+    if (!u || u === '#') return null;
+    if (/^[a-z][a-z0-9+.\-]*:/i.test(u) && !/^https?:/i.test(u)) return null;
+    return u;
+  }
+  function linkBtn(label, url, newTab, isDownload){
+    var u = safeUrl(url), a = el(u ? 'a' : 'span', 'get' + (u ? '' : ' off'), u ? label : '준비 중');
+    if (u){
+      a.href = u;
+      if (isDownload) a.setAttribute('download', '');             // 같은 사이트의 파일은 바로 내려받기
+      else if (newTab || /^https?:/i.test(u)){ a.target = '_blank'; a.rel = 'noopener'; }
+    }
+    return a;
+  }
+  // 앱 종류별 기본 표시/동작: pwa = 앱 페이지로 이동해 설치, download = 파일 내려받기, link = 외부 주소 열기
+  var TYPES = {
+    pwa:      {tag:'PWA',      btn:'설치하기'},
+    download: {tag:'다운로드', btn:'다운로드'},
+    link:     {tag:'바로가기', btn:'열기'}
+  };
+  function render(name, d){
+    var box = document.getElementById(name === 'about' ? 'about-body' : 'apps-body');
+    box.textContent = '';
+    if (name === 'about'){
+      if (d.tagline) box.appendChild(el('p', 'tagline', d.tagline));
+      (d.paragraphs || []).forEach(function(t){ box.appendChild(el('p', 'lead', t)); });
+      if ((d.links || []).length){
+        var wrap = el('div', 'links');
+        d.links.forEach(function(l){ wrap.appendChild(linkBtn(l.label || '링크', l.url, true)); });
+        box.appendChild(wrap);
+      }
+    } else {
+      var apps = d.apps || [];
+      if (!apps.length){ box.appendChild(el('p', 'lead', '아직 등록된 앱이 없어요.')); return; }
+      var grid = el('div', 'grid');
+      apps.forEach(function(ap){
+        var card = el('article', 'app'), type = TYPES[ap.type] ? ap.type : 'pwa', ty = TYPES[type];
+        var top = el('div', 'top');
+        if (ap.icon){
+          if (/\.(png|jpe?g|svg|webp|gif)$/i.test(ap.icon)){ var im = el('img', 'icon'); im.src = ap.icon; im.alt = ''; top.appendChild(im); }
+          else top.appendChild(el('span', 'icon', ap.icon));
+        }
+        top.appendChild(el('span', 'tag', ap.tag || ty.tag));
+        card.appendChild(top);
+        card.appendChild(el('h3', null, ap.name || '이름 없음'));
+        card.appendChild(el('p', null, ap.description || ''));
+        var meta = [ap.version, ap.size].filter(Boolean).join(' · ');
+        if (meta) card.appendChild(el('p', 'meta', meta));
+        card.appendChild(linkBtn(ap.button || ty.btn, ap.url, type === 'link' || ap.newTab, type === 'download'));
+        grid.appendChild(card);
+      });
+      box.appendChild(grid);
+    }
+  }
+  function load(name){
+    if (cache[name]) return cache[name];
+    return cache[name] = fetch(FILES[name], {cache:'no-cache'})
+      .then(function(r){ if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(function(d){ render(name, d); })
+      .catch(function(){
+        delete cache[name];                 // 다음에 다시 시도
+        var box = document.getElementById(name === 'about' ? 'about-body' : 'apps-body');
+        box.textContent = '';
+        box.appendChild(el('p', 'lead', location.protocol === 'file:'
+          ? '내용 파일(' + FILES[name] + ')을 읽지 못했어요. 컴퓨터에서 파일을 직접 열면 막혀요. github.io 에 올리거나 간단한 서버로 열어주세요.'
+          : '내용 파일(' + FILES[name] + ')을 불러오지 못했어요. 파일 이름과 위치를 확인해주세요.'));
+      });
+  }
+
+  function build(sx, sy){
+    var st = document.querySelector('.stage').getBoundingClientRect();
+    var R = st.width/5, S = Math.sqrt(3)/2, w = innerWidth, h = innerHeight, cells = [];
+    cover.setAttribute('viewBox', '0 0 ' + w + ' ' + h);
+    var iMin = Math.floor((-2*R - st.left)/(1.5*R)), iMax = Math.ceil((w + 2*R - st.left)/(1.5*R));
+    var jMin = Math.floor((-2*R - st.top)/(2*S*R)) - 1, jMax = Math.ceil((h + 2*R - st.top)/(2*S*R)) + 1;
+    for (var i=iMin;i<=iMax;i++) for (var j=jMin;j<=jMax;j++){
+      var cx = st.left + R*(1 + 1.5*i), cy = st.top + 2*S*R*(j + ((i&1) ? .5 : 0));
+      if (cx < -R || cx > w + R || cy < -S*R || cy > h + S*R) continue;
+      cells.push({cx:cx, cy:cy, d:Math.hypot(cx-sx, cy-sy)});
+    }
+    var max = Math.max.apply(null, cells.map(function(c){return c.d;})) || 1, end = 0, html = '';
+    cells.forEach(function(c){
+      var n = c.d/max, delay = reduce ? 0 : Math.round(n*720 + Math.random()*90);
+      end = Math.max(end, delay);
+      var x=c.cx, y=c.cy, a=R/2, b=S*R;
+      var pts = [[x-R,y],[x-a,y-b],[x+a,y-b],[x+R,y],[x+a,y+b],[x-a,y+b]]
+        .map(function(p){return p[0].toFixed(1)+','+p[1].toFixed(1);}).join(' ');
+      html += '<polygon class="cell" data-n="'+n.toFixed(3)+'" style="animation-delay:'+delay+'ms" points="'+pts+'"/>';
+    });
+    cover.innerHTML = html;
+    return end;
+  }
+
+  function openView(name){
+    curView = document.getElementById('view-' + name);
+    curView.classList.add('on'); curView.setAttribute('aria-hidden','false');
+    var back = curView.querySelector('.back');
+    setTimeout(function(){ back.focus({preventScroll:true}); }, 460);
+  }
+
+  function go(a){
+    if (busy) return; busy = true; cur = a;
+    load(a.getAttribute('data-view'));            // 연출이 진행되는 동안 미리 읽어둠
+    var r = a.getBoundingClientRect();
+    var end = build(r.left + r.width/2, r.top + r.height/2);
+    setTimeout(function(){
+      kw.textContent = a.getAttribute('data-ko'); ken.textContent = a.getAttribute('data-en');
+      curtain.classList.add('show');                       // 초록 화면 위에 글자만
+      setTimeout(function(){ openView(a.getAttribute('data-view')); }, 850);
+    }, end + 280);
+  }
+
+  // 돌아가기: 채워지던 순서의 반대로 벌집이 걷히며 첫 화면이 드러남
+  function close(){
+    if (!curView) return;
+    curView.classList.remove('on'); curView.setAttribute('aria-hidden','true'); curView = null;
+    curtain.classList.remove('show');
+    var end = 0;
+    Array.prototype.forEach.call(cover.querySelectorAll('.cell'), function(c){
+      var d = reduce ? 0 : Math.round((1 - parseFloat(c.getAttribute('data-n')))*700 + Math.random()*90);
+      end = Math.max(end, d); c.style.animationDelay = d + 'ms'; c.classList.add('out');
+    });
+    setTimeout(function(){ cover.innerHTML=''; busy=false; if (cur) cur.focus({preventScroll:true}); }, end + 320);
+  }
+
+  Array.prototype.forEach.call(document.querySelectorAll('.half'), function(a){
+    a.addEventListener('click', function(e){ e.preventDefault(); go(a); });   // 주소는 바뀌지 않음
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('.back'), function(b){ b.addEventListener('click', close); });
+  addEventListener('keydown', function(e){ if (e.key === 'Escape') close(); });
+})();
+</script>
+</body>
+</html>
